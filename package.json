@@ -1,0 +1,42 @@
+{
+  "name": "kakao-local-chat",
+  "displayName": "Local Chat",
+  "description": "로컬 PC카톡 수신 연동을 위한 채팅 패널",
+  "version": "0.3.7",
+  "license": "UNLICENSED",
+  "private": true,
+  "publisher": "local-workspace",
+  "engines": { "vscode": "^1.85.0", "node": ">=18" },
+  "categories": ["Other"],
+  "extensionKind": ["ui"],
+  "main": "./src/extension.cjs",
+  "activationEvents": ["onView:localChat.messages"],
+  "capabilities": { "untrustedWorkspaces": { "supported": false } },
+  "contributes": {
+    "commands": [
+      { "command": "localChat.open", "title": "카카오톡: 창 열기" }
+    ],
+    "viewsContainers": {
+      "activitybar": [{ "id": "localChat", "title": "Chat", "icon": "media/chat.svg" }]
+    },
+    "views": { "localChat": [{ "id": "localChat.messages", "name": "Chat", "type": "webview" }] },
+    "configuration": {
+      "title": "Local Chat",
+      "properties": {
+        "localChat.notifications": { "type": "boolean", "default": true, "scope": "application", "description": "방마다 마지막 새 메시지 감지 후 10초 동안 추가 메시지가 없으면 VS Code 알림을 표시합니다. 최초 연결과 재연결 시 기존 메시지는 알리지 않습니다." },
+        "localChat.notificationPreview": { "type": "boolean", "default": false, "scope": "application", "description": "수신한 본문이 있을 때 알림에 발신자와 한 줄 미리보기를 표시합니다." },
+        "localChat.roomSort": { "type": "string", "enum": ["recent", "unread"], "enumDescriptions": ["마지막 메시지가 최신인 순서", "안 읽은 방을 먼저 표시하고 최신순으로 정렬"], "default": "recent", "scope": "application", "description": "Chats 목록 정렬 방식입니다." },
+        "localChat.enableSending": {
+          "type": "boolean", "default": false, "scope": "application",
+          "description": "선택한 PC카톡 창을 복원하거나 활성화하지 않고 답장을 전달합니다. 기존 작성 내용이나 중복된 방 이름이 있으면 중단합니다. 실제 발송은 사용자가 확인해야 합니다."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.cjs",
+    "build": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/build-release.ps1",
+    "test:package": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/validate-package.ps1"
+  },
+  "devDependencies": { "@vscode/vsce": "4.1.1" }
+}

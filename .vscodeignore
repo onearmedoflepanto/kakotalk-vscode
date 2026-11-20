@@ -1,0 +1,14 @@
+**
+!package.json
+!README.md
+!src/**
+!media/**
+!tools/collector/prepare.ps1
+!bin/local-chat-worker.exe
+!licenses/**
+!tools/ClientMessageProbe.cs
+!tools/ClientChatWindow.cs
+!tools/ClientHistoryWindow.cs
+!tools/client-ui.ps1
+!tools/receiver-host.cjs
+!tools/room-state.ps1
