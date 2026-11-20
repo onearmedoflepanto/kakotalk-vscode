@@ -2,14 +2,14 @@
 param(
     [Parameter(Mandatory)][int] $TargetProcessId,
     [Parameter(Mandatory)][string] $RoomTitle,
-    [ValidatePattern('^[a-z0-9-]+\.json$')][string] $OutputName = 'snapshot.json'
+    [ValidatePattern('^[a-z0-9-]+\.json$')][string] $OutputName = 'snapshot.json',
+    [string] $RttiPath = '.generated/research/client-rtti-20261116.json'
 )
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 Add-Type -Path (Join-Path $PSScriptRoot 'ClientMessageProbe.cs')
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$rtti = Get-Content -LiteralPath (Join-Path $root '.generated/research/client-rtti-20261116.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-if ($rtti.FileSha256 -ne [LocalChatResearch.ClientMessageProbe]::ExpectedHash) { throw 'RTTI build mismatch.' }
+$rtti = Get-Content -LiteralPath (Join-Path $root $RttiPath) -Raw -Encoding UTF8 | ConvertFrom-Json
 $processInfo = Get-Process -Id $TargetProcessId
 $probe = [LocalChatResearch.ClientMessageProbe]::new($TargetProcessId, $processInfo.Path)
 function Address([string] $value) { [Convert]::ToUInt64(($value -replace '^0x', ''), 16) }
@@ -94,6 +94,7 @@ function Read-MapCandidate([uint64] $at, [int] $depth = 0) {
     if ($seen.Count -ne $count -or (U64 ($at + 0x10)) -ne $head -or (U64 ($at + 0x18)) -ne $count) { throw 'Attachment map changed while reading.' }
 }
 try {
+    if ($rtti.FileSha256 -ne $probe.FileSha256) { throw 'RTTI build mismatch.' }
     $tables = [Collections.Generic.List[uint64]]::new()
     $names = [Collections.Generic.List[string]]::new()
     $selectedClasses = '^\.\?AV(ChatLogContent_[A-Za-z]+|TalkChatRoom|TalkChatRoomInfo(?:_Mutable)?|TalkChatRoomManager|ChatListItemDataHeader|ChatThreadModel|ChatThreadListModel|ChatThreadListItemViewModel|AttentionChatThreadListItemViewModel)@@$'
@@ -159,7 +160,7 @@ try {
     })
     $document = [ordered]@{
         schemaVersion = 1; observedAt = [DateTimeOffset]::UtcNow.ToString('o'); pid = $TargetProcessId
-        fileSha256 = [LocalChatResearch.ClientMessageProbe]::ExpectedHash; imageBase = Hex $probe.ImageBase
+        fileSha256 = $probe.FileSha256; imageBase = Hex $probe.ImageBase
         method = 'ReadProcessMemory only; no client invocation, input, network calls or hooks.'
         roomTitle = $RoomTitle; roomId = $selectedId; scannedBytes = $search.ScannedBytes
         scanLimitReached = $search.ScanLimitReached; objectLimitReached = $search.ObjectLimitReached

@@ -9,7 +9,7 @@ import threading
 import ctypes
 import msvcrt
 
-from collector.collect import EXPECTED_HASH, process_identity
+from collector.collect import BUILDS, process_identity
 
 def main():
     for stream in (sys.stdin, sys.stdout, sys.stderr):
@@ -34,13 +34,16 @@ def main():
             address = target.get(key)
             if not isinstance(address, str) or not re.fullmatch(r'0x[0-9a-fA-F]{1,16}', address) or not 0 < int(address, 16) <= 0x7fffffffffff:
                 raise ValueError('Invalid input target address.')
-    if Path(filename).name.lower() != 'kakaotalk.exe' or hashlib.sha256(Path(filename).read_bytes()).hexdigest() != EXPECTED_HASH:
+    digest = hashlib.sha256(Path(filename).read_bytes()).hexdigest()
+    if Path(filename).name.lower() != 'kakaotalk.exe' or digest not in BUILDS:
         raise ValueError('Unsupported client build.')
     import frida
     if frida.__version__ != '17.26.3':
         raise ValueError('Unsupported observer runtime.')
     session = frida.get_local_device().attach(request['pid'])
-    script = session.create_script(Path(__file__).with_name('reply-agent.js').read_text(encoding='utf-8'))
+    source = 'const CLIENT_BUILD = ' + json.dumps(BUILDS[digest]) + ';\n'
+    source += Path(__file__).with_name('reply-agent.js').read_text(encoding='utf-8')
+    script = session.create_script(source)
     result = {'status':'error','code':'REPLY_PREPARE_FAILED'}
     clean = False
     finished = threading.Event()

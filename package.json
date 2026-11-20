@@ -2,7 +2,7 @@
   "name": "kakao-local-chat",
   "displayName": "Local Chat",
   "description": "로컬 PC카톡 수신 연동을 위한 채팅 패널",
-  "version": "0.3.7",
+  "version": "0.3.8",
   "license": "UNLICENSED",
   "private": true,
   "publisher": "local-workspace",

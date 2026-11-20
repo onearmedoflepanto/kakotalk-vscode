@@ -6,10 +6,12 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { validateMessage } = require('../src/protocol.cjs');
 const source = fs.readFileSync(path.join(__dirname, '../tools/collector/agent.js'), 'utf8');
+const builds = Object.values(require('../tools/client-builds.json'));
 
 function fixture(options = {}) {
   const base = 0x140000000n;
-  const target = base + 0x13fb9d0n;
+  const build = options.build || builds[0];
+  const target = base + BigInt(build.setter);
   const original = Buffer.from('48895c2418555657415441554156415748', 'hex');
   const regions = new Map();
   const add = (address, size) => { const data = Buffer.alloc(size); regions.set(BigInt(address), data); return data; };
@@ -22,12 +24,12 @@ function fixture(options = {}) {
   log.writeBigUInt64LE(90000001n, 0x18);
   log.writeBigUInt64LE(bodyHeader + 32n, 0x30);
   const room = add(0x400000n, 0x200), info = add(0x500000n, 0x80);
-  room.writeBigUInt64LE(base + 0x29c2ac8n);
+  room.writeBigUInt64LE(base + BigInt(build.tables.TalkChatRoom));
   room.writeBigUInt64LE(0x500000n, 0x188);
   room.writeBigUInt64LE(logAddress - 0x20n, 0xe8);
-  info.writeBigUInt64LE(base + 0x2a14788n);
+  info.writeBigUInt64LE(base + BigInt(build.tables.TalkChatRoomInfo_Mutable));
   info.writeBigUInt64LE(90000000000001n, 0x18);
-  user.writeBigUInt64LE(base + 0x280f948n, 0);
+  user.writeBigUInt64LE(base + BigInt(build.tables.TalkUser_Mutable), 0);
   user.writeBigUInt64LE(90000001n, 0x20);
   Buffer.from('테스터').copy(user, 0x38);
   user.writeBigUInt64LE(9n, 0x48); user.writeBigUInt64LE(15n, 0x50);
@@ -63,6 +65,7 @@ function fixture(options = {}) {
   const clock = { now: Date.now() };
   class Clock extends Date { static now() { return clock.now; } }
   const sandbox = {
+    CLIENT_BUILD: build,
     Process: { arch: 'x64', pointerSize: 8, id: 9001,
       getModuleByName: () => ({ path: 'C:\\Program Files\\KakaoTalk\\KakaoTalk.exe', base: new Pointer(base) }) },
     Interceptor: {
@@ -114,8 +117,8 @@ function fixture(options = {}) {
   };
 }
 
-test('copies unknown Korean/multiline/emoji text with exact 64-bit IDs', () => {
-  const f = fixture(); f.start(); f.call(); f.tick();
+for (const build of builds) test(`copies Korean/multiline/emoji text on ${build.version}`, () => {
+  const f = fixture({build}); f.start(); f.call(); f.tick();
   const event = f.sent[0].events[0];
   assert.equal(event.text, '새 문장 😀\n두 번째 줄');
   assert.equal(event.id, '9000000000000001001');

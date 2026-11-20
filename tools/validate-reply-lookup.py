@@ -9,7 +9,7 @@ import time
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'tools' / 'collector'))
-from collect import EXPECTED_HASH, process_identity
+from collect import BUILDS, process_identity
 import hashlib
 import frida
 
@@ -18,9 +18,11 @@ def main():
     request = json.loads((ROOT / '.generated/integration/input-cache-validation.json').read_text(encoding='utf-8'))['request']
     filename, started = process_identity(request['pid'])
     assert request['inputTarget']['processStartFileTime'] == started
-    assert hashlib.sha256(Path(filename).read_bytes()).hexdigest() == EXPECTED_HASH
+    digest = hashlib.sha256(Path(filename).read_bytes()).hexdigest()
+    assert digest in BUILDS
     assert frida.__version__ == '17.26.3'
-    source = (ROOT / 'tools/reply-agent.js').read_text(encoding='utf-8')
+    source = 'const CLIENT_BUILD = ' + json.dumps(BUILDS[digest]) + ';\n'
+    source += (ROOT / 'tools/reply-agent.js').read_text(encoding='utf-8')
     source += "\nrpc.exports.lookuponly = request => { const c=locate(request); return {window:c.window.toString(),editor:c.editor.toString()}; };"
     session = frida.get_local_device().attach(request['pid'])
     script = session.create_script(source)

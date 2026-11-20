@@ -38,6 +38,7 @@ try {
         '--specpath', $stage, '--collect-all', 'frida', '--copy-metadata', 'frida',
         '--add-data', ((Join-Path $projectRoot 'tools\collector\agent.js') + ':collector'),
         '--add-data', ((Join-Path $projectRoot 'tools\reply-agent.js') + ':.'),
+        '--add-data', ((Join-Path $projectRoot 'tools\client-builds.json') + ':.'),
         (Join-Path $projectRoot 'tools\worker.py'))
     & $python @buildArgs
     if ($LASTEXITCODE -ne 0) { throw 'Worker compilation failed.' }

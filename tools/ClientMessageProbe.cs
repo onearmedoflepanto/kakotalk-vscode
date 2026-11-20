@@ -38,6 +38,24 @@ namespace LocalChatResearch
         static extern bool IsChild(IntPtr parent, IntPtr child);
 
         public const string ExpectedHash = "bfb4206321786d0f5c8a9e0ff2a1959e0e901a18bcea40a652b49229b8b86bf1";
+        public const string OctoberHash = "74b5cb59eef61a9c011d6f731619982753c1b20b0848cf121a90e46c7fe2a820";
+        public readonly string FileSha256;
+        public readonly string ClientVersion;
+        public readonly uint SetterRva;
+        readonly Dictionary<string, ulong> buildTables;
+        static readonly string[] buildClasses = { "ChatLogContent_Msg", "ChatLogContent_TextMsg", "ChatLogContent_EmoticonText",
+            "TalkChatRoom", "TalkChatRoomInfo_Mutable", "TalkUser_Mutable", "TalkUser", "ChatLogContent_Reply",
+            "ChatLogContent_BalloonFactory", "ChatLogContent_Photo", "CChatDlg", "ChatRoom_ViewModel", "ChatDelegate_Input" };
+        public static ulong[] BuildTableRvas(string hash)
+        {
+            if (hash == ExpectedHash) return new ulong[] { 0x2949870, 0x27fd660, 0x2915158, 0x29c2ac8, 0x2a14788,
+                0x280f948, 0x280f918, 0x2946210, 0x2946438, 0x294a150, 0x2943a70, 0x2907f30, 0x27f3c00 };
+            if (hash == OctoberHash) return new ulong[] { 0x2964258, 0x2817248, 0x292fb70, 0x29ddd50, 0x2a320d8,
+                0x2829a98, 0x2829a68, 0x29606e8, 0x2960920, 0x2964ad8, 0x295f0a8, 0x2922bf0, 0x280d1e0 };
+            throw new InvalidOperationException("Unsupported client build.");
+        }
+        ulong Table(string name) { return buildTables[".?AV" + name + "@@"]; }
+        ulong[] Tables(string[] names) { return Array.ConvertAll(names, name => buildTables[name]); }
         IntPtr handle;
         public readonly ulong ImageBase;
         public readonly int ImageSize;
@@ -96,7 +114,7 @@ namespace LocalChatResearch
         {
             ulong roomId = UInt64.Parse(selectedRoomId), messageId = UInt64.Parse(selectedMessageId), senderId = UInt64.Parse(selectedSenderId);
             if (roomId == 0 || messageId == 0 || senderId == 0) throw new ArgumentException("Invalid image identity.");
-            SearchResult search = FindObjects(new ulong[] { 0x294a150 }, new string[] { ".?AVChatLogContent_Photo@@" });
+            SearchResult search = FindObjects(new ulong[] { Table("ChatLogContent_Photo") }, new string[] { ".?AVChatLogContent_Photo@@" });
             if (search.ScanLimitReached || search.ObjectLimitReached) throw new InvalidOperationException("Image discovery limit reached.");
             ulong photo = 0;
             foreach (ObjectHit hit in search.Objects) {
@@ -158,7 +176,7 @@ namespace LocalChatResearch
                 inputTargets.Remove(roomId);
             }
             InputDiscoveryCount++;
-            SearchResult found = FindObjects(new ulong[] { 0x2943a70 }, new string[] { ".?AVCChatDlg@@" });
+            SearchResult found = FindObjects(new ulong[] { Table("CChatDlg") }, new string[] { ".?AVCChatDlg@@" });
             if (found.ScanLimitReached || found.ObjectLimitReached) throw new InvalidOperationException("Input discovery limit reached.");
             InputTarget result = null;
             foreach (ObjectHit item in found.Objects) {
@@ -217,10 +235,20 @@ namespace LocalChatResearch
                     throw new InvalidOperationException("Unexpected target path.");
                 using (var stream = File.OpenRead(m.FileName))
                 using (var sha = SHA256.Create())
-                    if (BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", "").ToLowerInvariant() != ExpectedHash)
-                        throw new InvalidOperationException("Client build differs from the analyzed build.");
+                    FileSha256 = BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", "").ToLowerInvariant();
+                ClientVersion = FileVersionInfo.GetVersionInfo(m.FileName).FileVersion;
+                if (FileSha256 != ExpectedHash && FileSha256 != OctoberHash)
+                    throw new InvalidOperationException("지원하지 않는 PC카톡 빌드입니다. 현재 버전: " + ClientVersion
+                        + ". 지원 버전: 26.9.2.5342, 26.10.0.5364. 확장 업데이트가 필요합니다.");
+                SetterRva = FileSha256 == ExpectedHash ? 0x13fb9d0U : 0x1405c00U;
+                buildTables = new Dictionary<string, ulong>();
+                ulong[] tableRvas = BuildTableRvas(FileSha256);
+                for (int i = 0; i < buildClasses.Length; i++) buildTables[".?AV" + buildClasses[i] + "@@"] = tableRvas[i];
                 ImageBase = (ulong)m.BaseAddress.ToInt64();
                 ImageSize = m.ModuleMemorySize;
+                foreach (var table in buildTables)
+                    if (TableTypeName(ImageBase + table.Value) != table.Key)
+                        throw new InvalidOperationException("PC카톡 클래스 구조가 지원 빌드와 일치하지 않습니다.");
                 long created, exited, kernel, user;
                 if (!GetProcessTimes(handle, out created, out exited, out kernel, out user) || p.HasExited || created != p.StartTime.ToUniversalTime().ToFileTimeUtc())
                     throw new InvalidOperationException("Client process changed during initialization.");
@@ -365,9 +393,8 @@ namespace LocalChatResearch
         {
             ulong roomId;
             if (!UInt64.TryParse(selectedRoomId, out roomId) || roomId == 0) throw new ArgumentException("A numeric room ID is required.");
-            ulong[] tables = { 0x2949870, 0x27fd660, 0x2915158, 0x29c2ac8, 0x280f948, 0x280f918, 0x2946210, 0x2946438, 0x294a150 };
             string[] classes = { ".?AVChatLogContent_Msg@@", ".?AVChatLogContent_TextMsg@@", ".?AVChatLogContent_EmoticonText@@", ".?AVTalkChatRoom@@", ".?AVTalkUser_Mutable@@", ".?AVTalkUser@@", ".?AVChatLogContent_Reply@@", ".?AVChatLogContent_BalloonFactory@@", ".?AVChatLogContent_Photo@@" };
-            SearchResult search = FindObjects(tables, classes);
+            SearchResult search = FindObjects(Tables(classes), classes);
             if (search.ScanLimitReached || search.ObjectLimitReached) throw new InvalidOperationException("Object discovery limit reached.");
             var result = new CollectorMetadata { RoomId = selectedRoomId, ScannedBytes = search.ScannedBytes };
             var seenMessages = new HashSet<string>(); var seenUsers = new HashSet<string>();
@@ -432,7 +459,7 @@ namespace LocalChatResearch
         }
         public List<RoomChoice> DiscoverRooms()
         {
-            SearchResult search = FindObjects(new ulong[] { 0x29c2ac8 }, new string[] { ".?AVTalkChatRoom@@" });
+            SearchResult search = FindObjects(new ulong[] { Table("TalkChatRoom") }, new string[] { ".?AVTalkChatRoom@@" });
             if (search.ScanLimitReached || search.ObjectLimitReached) throw new InvalidOperationException("Room discovery limit reached.");
             var result = new List<RoomChoice>(); var seen = new HashSet<ulong>();
             foreach (ObjectHit item in search.Objects)
@@ -453,7 +480,7 @@ namespace LocalChatResearch
         {
             if (refresh || DateTime.UtcNow - stateScanAt > TimeSpan.FromSeconds(30))
             {
-                SearchResult found = FindObjects(new ulong[] { 0x29c2ac8 }, new string[] { ".?AVTalkChatRoom@@" });
+                SearchResult found = FindObjects(new ulong[] { Table("TalkChatRoom") }, new string[] { ".?AVTalkChatRoom@@" });
                 if (found.ScanLimitReached || found.ObjectLimitReached) throw new InvalidOperationException("Room state discovery limit reached.");
                 stateRooms.Clear();
                 foreach (ObjectHit item in found.Objects) stateRooms.Add(Address(item.Address));
@@ -530,7 +557,10 @@ namespace LocalChatResearch
         {
             byte[] pointer = Read(instance, 8);
             if (pointer == null) return null;
-            ulong vtable = BitConverter.ToUInt64(pointer, 0);
+            return TableTypeName(BitConverter.ToUInt64(pointer, 0));
+        }
+        string TableTypeName(ulong vtable)
+        {
             if (vtable < ImageBase + 8 || vtable >= ImageBase + (ulong)ImageSize) return null;
             byte[] locatorPointer = Read(vtable - 8, 8);
             if (locatorPointer == null) return null;
@@ -604,11 +634,9 @@ namespace LocalChatResearch
         public ValidationResult Validate(string body, string senderName, string roomName)
         {
             if (String.IsNullOrWhiteSpace(senderName) || String.IsNullOrWhiteSpace(roomName)) throw new ArgumentException("Expected sender and room are required.");
-            // These tables belong only to ExpectedHash; construction rejects every other build.
-            ulong[] tables = { 0x2949870, 0x27fd660, 0x2915158, 0x29c2ac8, 0x2a14788, 0x280f948 };
             string[] classes = { ".?AVChatLogContent_Msg@@", ".?AVChatLogContent_TextMsg@@", ".?AVChatLogContent_EmoticonText@@",
                 ".?AVTalkChatRoom@@", ".?AVTalkChatRoomInfo_Mutable@@", ".?AVTalkUser_Mutable@@" };
-            SearchResult search = Find(body, tables, classes);
+            SearchResult search = Find(body, Tables(classes), classes);
             var result = new ValidationResult { Status = "not-matched", ScannedBytes = search.ScannedBytes,
                 ScanLimitReached = search.ScanLimitReached, ObjectLimitReached = search.ObjectLimitReached };
             foreach (ObjectHit ui in search.Objects)
@@ -622,12 +650,12 @@ namespace LocalChatResearch
                 ulong vtable = Value(uiAddress), setter = Value(vtable + 24);
                 if (setter < ImageBase || setter >= ImageBase + (ulong)ImageSize) continue;
                 uint setterRva = (uint)(setter - ImageBase);
-                bool callPath = setterRva == 0x13fb9d0;
+                bool callPath = setterRva == SetterRva;
                 int callOffset = ui.Class == ".?AVChatLogContent_EmoticonText@@" ? 0x10 : ui.Class == ".?AVChatLogContent_TextMsg@@" ? 9 : -1;
                 if (!callPath && callOffset >= 0)
                 {
                     byte[] call = Code(setterRva + (uint)callOffset, 5);
-                    callPath = call != null && call[0] == 0xe8 && setterRva + (long)callOffset + 5 + BitConverter.ToInt32(call, 1) == 0x13fb9d0;
+                    callPath = call != null && call[0] == 0xe8 && setterRva + (long)callOffset + 5 + BitConverter.ToInt32(call, 1) == SetterRva;
                 }
                 if (!callPath) continue;
                 foreach (ObjectHit room in search.Objects)
@@ -666,7 +694,7 @@ namespace LocalChatResearch
                             SenderName = senderText.Text, SenderId = senderId.ToString(), RoomName = roomText.Text, RoomId = roomId.ToString(), MessageId = messageId.ToString(),
                             UiObject = ui.Address, UiClass = ui.Class, RoomObject = room.Address, RoomInfoObject = Hex(infoAddress), ChatDbObject = Hex(dbAddress),
                             InputObject = Hex(input), SenderObject = user.Address, InputBodyPointer = Hex(inputBodyPointer), UiBodyPointer = Hex(uiBodyPointer),
-                            OverrideRva = Hex(setterRva), BaseSetterRva = "0x13FB9D0", BodyExactMatch = true, SenderExactMatch = true,
+                            OverrideRva = Hex(setterRva), BaseSetterRva = Hex(SetterRva), BodyExactMatch = true, SenderExactMatch = true,
                             RoomExactMatch = true, Stable = true, CallPathVerified = true, FunctionEntryObserved = false
                         });
                     }

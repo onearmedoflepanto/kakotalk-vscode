@@ -2,10 +2,10 @@
 
 // Only the local UI model setter is observed. Arguments and return values are
 // never replaced, and no KakaoTalk function or network API is called here.
-const SETTER_RVA = 0x13fb9d0;
+const SETTER_RVA = Number(CLIENT_BUILD.setter);
 const PROLOGUE = '48895c2418555657415441554156415748';
-const USER_VTABLE_RVA = 0x280f948;
-const IMMUTABLE_USER_VTABLE_RVA = 0x280f918;
+const USER_VTABLE_RVA = Number(CLIENT_BUILD.tables.TalkUser_Mutable);
+const IMMUTABLE_USER_VTABLE_RVA = Number(CLIENT_BUILD.tables.TalkUser);
 const MAX_BODY_BYTES = 8192;
 const MAX_QUEUE = 512;
 const MAX_SEEN = 16384;
@@ -223,7 +223,7 @@ rpc.exports = {
         const room = ptr(value.roomObject);
         const info = room.add(0x188).readPointer();
         snapshotState = 'room-object-changed';
-        if (room.readPointer().equals(moduleBase.add(0x29c2ac8)) && info.readPointer().equals(moduleBase.add(0x2a14788)) &&
+        if (room.readPointer().equals(moduleBase.add(Number(CLIENT_BUILD.tables.TalkChatRoom))) && info.readPointer().equals(moduleBase.add(Number(CLIENT_BUILD.tables.TalkChatRoomInfo_Mutable))) &&
             info.add(0x18).readU64().toString() === value.roomId) {
           captureLog(room.add(0xe8).readPointer().add(0x20), 'cache-snapshot');
           snapshotState = counters.snapshots ? 'captured' : 'no-text-cache';
@@ -237,7 +237,7 @@ rpc.exports = {
         send({ kind: 'stopped', ...result });
       } else { flush(); }
     }, 50);
-    return { attached: true, pid: Process.id, roomId: value.roomId, setterRva: '0x13FB9D0', baselineCount: seen.size, snapshotState, functionEntryObserved: false };
+    return { attached: true, pid: Process.id, roomId: value.roomId, setterRva: CLIENT_BUILD.setter, clientVersion: CLIENT_BUILD.version, baselineCount: seen.size, snapshotState, functionEntryObserved: false };
   },
   history(value) {
     if (!active || value.pid !== Process.id || value.roomId !== configuration.roomId ||

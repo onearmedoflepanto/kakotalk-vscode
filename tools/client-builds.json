@@ -1,0 +1,24 @@
+{
+  "bfb4206321786d0f5c8a9e0ff2a1959e0e901a18bcea40a652b49229b8b86bf1": {
+    "version": "26.9.2.5342",
+    "setter": "0x13fb9d0",
+    "replySelector": "0x83d380",
+    "tables": {
+      "ChatLogContent_Msg": "0x2949870", "ChatLogContent_TextMsg": "0x27fd660", "ChatLogContent_EmoticonText": "0x2915158",
+      "TalkChatRoom": "0x29c2ac8", "TalkChatRoomInfo_Mutable": "0x2a14788", "TalkUser_Mutable": "0x280f948", "TalkUser": "0x280f918",
+      "ChatLogContent_Reply": "0x2946210", "ChatLogContent_BalloonFactory": "0x2946438", "ChatLogContent_Photo": "0x294a150",
+      "CChatDlg": "0x2943a70", "ChatRoom_ViewModel": "0x2907f30", "ChatDelegate_Input": "0x27f3c00"
+    }
+  },
+  "74b5cb59eef61a9c011d6f731619982753c1b20b0848cf121a90e46c7fe2a820": {
+    "version": "26.10.0.5364",
+    "setter": "0x1405c00",
+    "replySelector": "0x83e710",
+    "tables": {
+      "ChatLogContent_Msg": "0x2964258", "ChatLogContent_TextMsg": "0x2817248", "ChatLogContent_EmoticonText": "0x292fb70",
+      "TalkChatRoom": "0x29ddd50", "TalkChatRoomInfo_Mutable": "0x2a320d8", "TalkUser_Mutable": "0x2829a98", "TalkUser": "0x2829a68",
+      "ChatLogContent_Reply": "0x29606e8", "ChatLogContent_BalloonFactory": "0x2960920", "ChatLogContent_Photo": "0x2964ad8",
+      "CChatDlg": "0x295f0a8", "ChatRoom_ViewModel": "0x2922bf0", "ChatDelegate_Input": "0x280d1e0"
+    }
+  }
+}

@@ -21,9 +21,9 @@ function title(hwnd) { const b=Memory.alloc(514); const n=getText(hwnd,b,257); r
 function owned(hwnd) { const p=Memory.alloc(4);owner(hwnd,p);return isWindow(hwnd)&&p.readU32()===Process.id; }
 function matches(p,rva) { try{return p.readPointer().equals(base.add(rva));}catch(_){return false;} }
 function context(dialog,request) {
-  if(!matches(dialog,0x2943a70))fail('ROOM_CHANGED');
+  if(!matches(dialog,Number(CLIENT_BUILD.tables.CChatDlg)))fail('ROOM_CHANGED');
   const model=dialog.add(0x640).readPointer(), room=model.add(0xe8).readPointer(), info=room.add(0x188).readPointer(), input=dialog.add(0xbe8).readPointer();
-  if(!matches(model,0x2907f30)||!matches(room,0x29c2ac8)||!matches(input,0x27f3c00)||info.add(0x18).readU64().toString()!==request.roomId||!input.add(0x38).readPointer().equals(model)||!input.add(0x28).readPointer().equals(dialog))fail('ROOM_CHANGED');
+  if(!matches(model,Number(CLIENT_BUILD.tables.ChatRoom_ViewModel))||!matches(room,Number(CLIENT_BUILD.tables.TalkChatRoom))||!matches(input,Number(CLIENT_BUILD.tables.ChatDelegate_Input))||info.add(0x18).readU64().toString()!==request.roomId||!input.add(0x38).readPointer().equals(model)||!input.add(0x28).readPointer().equals(dialog))fail('ROOM_CHANGED');
   const window=dialog.add(0x40).readPointer(),editor=input.add(0x48).readPointer().add(0x40).readPointer();
   if(!owned(window)||!owned(editor)||title(window)!==request.roomTitle)fail('ROOM_CHANGED');
   return {dialog,input,window,editor};
@@ -36,7 +36,7 @@ function locate(request) {
     if(!c.window.equals(ptr(target.window))||!c.editor.equals(ptr(target.editor)))fail('ROOM_CHANGED');
     return c;
   }
-  const candidates=[],pattern=base.add(0x2943a70).toMatchPattern(),started=Date.now();let total=0;
+  const candidates=[],pattern=base.add(Number(CLIENT_BUILD.tables.CChatDlg)).toMatchPattern(),started=Date.now();let total=0;
   for(const r of Process.enumerateRanges('rw-')) {
     total+=r.size;if(total>1024*1024*1024||Date.now()-started>6000)fail('REPLY_UNAVAILABLE');
     // Bound each read, including large regions, without silently omitting candidate objects.
@@ -63,7 +63,7 @@ rpc.exports = {
   async prepare(request) {
     try {
       if(cancelled||Process.arch!=='x64'||!Number.isInteger(request.pid)||request.pid!==Process.id||!/^[0-9a-f]{32}$/.test(request.nonce))fail('REPLY_PREPARE_FAILED');
-      const functionAt=base.add(0x83d380);
+      const functionAt=base.add(Number(CLIENT_BUILD.replySelector));
       if(bytes(functionAt)!==[0x48,0x89,0x5c,0x24,0x20,0x55,0x56,0x57,0x41,0x54,0x41,0x55,0x41,0x56,0x41,0x57].join(','))fail('REPLY_PREPARE_FAILED');
       const found=locate(request);
       const message=registerMessage(Memory.allocUtf16String('LocalChat.Reply.'+request.nonce));

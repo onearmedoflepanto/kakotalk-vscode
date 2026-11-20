@@ -15,7 +15,7 @@ import threading
 from collections import deque
 from datetime import datetime, timezone
 
-EXPECTED_HASH = "bfb4206321786d0f5c8a9e0ff2a1959e0e901a18bcea40a652b49229b8b86bf1"
+BUILDS = json.loads((Path(__file__).resolve().parents[1] / "client-builds.json").read_text(encoding="utf-8"))
 PROJECT = Path(__file__).resolve().parents[2]
 OUTPUT_ROOT = PROJECT / ".generated" / "collector"
 
@@ -59,7 +59,7 @@ def load_metadata(path):
 
 
 def validate_metadata(value):
-    if value.get("schemaVersion") != 1 or value.get("fileSha256") != EXPECTED_HASH:
+    if value.get("schemaVersion") != 1 or value.get("fileSha256") not in BUILDS:
         raise ValueError("Unsupported metadata build.")
     observed = datetime.fromisoformat(value["observedAt"])
     age = (datetime.now(timezone.utc) - observed).total_seconds()
@@ -72,8 +72,8 @@ def validate_metadata(value):
         raise ValueError("Expected KakaoTalk.exe.")
     with open(actual_path, "rb") as source:
         digest = hashlib.file_digest(source, "sha256").hexdigest()
-    if digest != EXPECTED_HASH:
-        raise ValueError("Client build differs from the analyzed build.")
+    if digest != value["fileSha256"]:
+        raise ValueError("PC카톡 빌드가 연결 준비 중 변경됐습니다. 다시 연결해 주세요.")
     return value
 
 
@@ -204,7 +204,9 @@ def main():
         emit({"status": "attaching"}, sys.stderr)
         session = frida.get_local_device().attach(metadata["pid"])
         session.on("detached", detached)
-        script = session.create_script((Path(__file__).with_name("agent.js")).read_text(encoding="utf-8"), name="kakao-local-message-observer")
+        source = "const CLIENT_BUILD = " + json.dumps(BUILDS[metadata["fileSha256"]]) + ";\n"
+        source += Path(__file__).with_name("agent.js").read_text(encoding="utf-8")
+        script = session.create_script(source, name="kakao-local-message-observer")
         script.on("message", receive)
         emit({"status": "loading"}, sys.stderr)
         script.load()
@@ -291,7 +293,7 @@ def main():
                 cleanup["detachError"] = str(error)
         summary = {
             "observedAt": datetime.now(timezone.utc).isoformat(), "pid": metadata["pid"],
-            "roomId": metadata["roomId"], "fileSha256": EXPECTED_HASH, "status": "error" if failure else "stopped",
+            "roomId": metadata["roomId"], "fileSha256": metadata["fileSha256"], "status": "error" if failure else "stopped",
             "reason": exit_reason, "eventCount": event_count, "events": audit_events,
             "counters": counters, "cleanup": cleanup, "functionEntryObserved": function_entry_count > 0,
             "networkReceiveVerified": False, "includeExisting": options.include_existing,

@@ -31,7 +31,7 @@ try {
         pid = $TargetProcessId
         path = $ExpectedPath
         processStartFileTime = $processInfo.StartTime.ToUniversalTime().ToFileTimeUtc().ToString()
-        fileSha256 = [LocalChatResearch.ClientMessageProbe]::ExpectedHash
+        fileSha256 = $probe.FileSha256
         roomId = $metadata.RoomId
         roomTitle = $metadata.RoomTitle
         roomObject = $metadata.RoomObject

@@ -40,6 +40,17 @@ try {
     $app = Join-Path $extract 'extension'
     $manifest = Get-Content -LiteralPath (Join-Path $app 'package.json') -Raw -Encoding UTF8 | ConvertFrom-Json
     Assert ($manifest.version -eq $version -and $manifest.publisher -eq 'local-workspace' -and $manifest.name -eq 'kakao-local-chat') 'Packaged manifest mismatch.'
+    Add-Type -Path (Join-Path $app 'tools/ClientMessageProbe.cs')
+    $builds = Get-Content -LiteralPath (Join-Path $projectRoot 'tools/client-builds.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+    foreach ($build in $builds.PSObject.Properties) {
+        $tables = [LocalChatResearch.ClientMessageProbe]::BuildTableRvas($build.Name)
+        $expected = @($build.Value.tables.PSObject.Properties | ForEach-Object { [Convert]::ToUInt64($_.Value.Substring(2), 16) })
+        Assert (($tables -join ',') -ceq ($expected -join ',')) ("Client and worker tables differ: " + $build.Value.version)
+    }
+    $unsupportedRejected = $false
+    try { [LocalChatResearch.ClientMessageProbe]::BuildTableRvas(('0' * 64)) | Out-Null }
+    catch { $unsupportedRejected = $_.Exception.GetBaseException().Message -eq 'Unsupported client build.' }
+    Assert $unsupportedRejected 'Unsupported client build was accepted.'
     $tokens = $null; $parseErrors = $null
     $null = [Management.Automation.Language.Parser]::ParseFile((Join-Path $bundle 'install.ps1'), [ref]$tokens, [ref]$parseErrors)
     Assert ($parseErrors.Count -eq 0) 'The installation script has syntax errors.'

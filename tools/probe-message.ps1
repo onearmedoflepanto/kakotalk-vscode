@@ -9,7 +9,8 @@ param(
     [string[]] $Addresses,
     [int] $Length = 256,
     [switch] $Wide,
-    [string] $OutputName
+    [string] $OutputName,
+    [string] $RttiPath = '.generated/research/client-rtti-20261116.json'
 )
 $ErrorActionPreference = 'Stop'
 Add-Type -Path (Join-Path $PSScriptRoot 'ClientMessageProbe.cs')
@@ -18,8 +19,8 @@ $probe = [LocalChatResearch.ClientMessageProbe]::new($TargetProcessId, $Expected
 try {
     $values = @($Addresses | Where-Object { $_ } | ForEach-Object { $_ -split ',' } | ForEach-Object { [Convert]::ToUInt64(($_ -replace '^0x', ''), 16) })
     if ($Mode -eq 'Find') {
-            $rtti = Get-Content -LiteralPath (Join-Path $projectRoot '.generated/research/client-rtti-20261116.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-            if ($rtti.FileSha256 -ne [LocalChatResearch.ClientMessageProbe]::ExpectedHash) { throw 'RTTI evidence is for another build.' }
+            $rtti = Get-Content -LiteralPath (Join-Path $projectRoot $RttiPath) -Raw -Encoding UTF8 | ConvertFrom-Json
+            if ($rtti.FileSha256 -ne $probe.FileSha256) { throw 'RTTI evidence is for another build.' }
             $tables = @(); $names = @()
             foreach ($candidate in $rtti.Inspection.Candidates) {
                 if ($candidate.Name -notmatch '^\.\?AV(ChatLogContent_|TalkChatRoom@@|TalkChatRoomInfo)') { continue }
@@ -84,7 +85,7 @@ try {
         ObservedAt = [DateTimeOffset]::Now.ToString('o')
         ProcessId = $TargetProcessId
         Mode = $Mode
-        FileSha256 = [LocalChatResearch.ClientMessageProbe]::ExpectedHash
+        FileSha256 = $probe.FileSha256
         ImageBase = [LocalChatResearch.ClientMessageProbe]::Hex($probe.ImageBase)
         ScannedBytes = $probe.ScannedBytes
         ReadFailures = $probe.ReadFailures
